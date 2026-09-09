@@ -9,7 +9,7 @@ import ts from "typescript"
 /** The repository. */
 const root = path.resolve(import.meta.dirname, "..")
 /** Directories to scan. */
-const roots = ["src", "types", "scripts"]
+const roots = ["src", "types", "scripts", "bench"]
 
 /** Every .ts and .mjs file under a directory. */
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

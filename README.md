@@ -73,6 +73,50 @@ The types come as ambient namespaces (`Cli`, `Files`, `System`, `Ui`,
 `Workers`) referenced from the package's declarations, so they are visible
 without an import.
 
+## Benchmarks
+
+Measured on an 8-core Linux box with 24 GB RAM, Node 24, ESLint 10.10.
+Wall-clock is the median of 3 runs; "warm" means the second run, with the
+cache primed or the workers left by the first run. Every row reports the
+same problem counts. Reproduce with `npm run bench` (see `bench/`).
+
+**Synthetic corpus**: 2,000 TypeScript files, 415k lines, `@eslint/js` +
+`typescript-eslint` recommended (no type-aware rules).
+
+| | wall | CPU (user+sys) |
+|---|---:|---:|
+| `eslint .` | 56 s | 77 s |
+| `eslint . --cache` (warm) | 3.0 s | 3.9 s |
+| `eslint . --concurrency=auto` | 24.2 s | 116 s |
+| `eslint . --concurrency=auto --cache` (warm) | 2.9 s | 4.0 s |
+| `concurrent-eslint --no-daemon` | 23.5 s | 111 s |
+| `concurrent-eslint --no-daemon --cache` (warm) | 4.3 s | 16 s |
+| `concurrent-eslint` (warm workers) | **17.7 s** | ¹ |
+| `concurrent-eslint --cache` (warm workers + cache) | **2.1 s** | ¹ |
+
+**Small project**: this repository, 34 files.
+
+| | wall |
+|---:|---:|
+| `eslint .` / `--concurrency=auto` | 2.8 s |
+| `eslint . --cache` (warm) | 1.5 s |
+| `concurrent-eslint --no-daemon` | 2.9 s |
+| `concurrent-eslint` (warm workers) | **0.66 s** |
+| `concurrent-eslint --cache` (warm workers + cache) | **0.25 s** |
+
+**Real application**: a Nuxt/Vue code base, 1,859 files, `vue-eslint-parser`,
+`eslint-plugin-vue`, `eslint-plugin-import-x` with the TypeScript resolver.
+Measured on the same machine while an IDE and a dev server held 12 GB, so
+the safeguard was parking workers against the 75% memory budget for most of
+each run.
+
+| | wall |
+|---|---:|
+| `eslint .` | 148 s |
+| `eslint . --concurrency=auto` | 60 s |
+| `concurrent-eslint --no-daemon` | 68–75 s |
+| `concurrent-eslint` (warm workers) | **41–61 s** |
+
 ## Development
 
 ```bash
@@ -105,14 +149,6 @@ src/
   workers/          worker process, ipc, daemon, the Pool
 scripts/build.mjs   tsc, then ships types/ next to dist/ and references them
 ```
-
-Conventions: 4-space indent, arrow functions, related functions grouped
-into one object with methods (`files.walk`, `cache.merge`, `daemon.stop`,
-`args.parse`), short names. All interfaces and type aliases live in
-`types/*.d.ts` as global namespaces named after the folder they belong to
-(`Cli.Options`, `Files.WalkOptions`, `System.Plan`, `Ui.Palette`,
-`Workers.Slot`) and are used without imports, in tests too. The build copies
-them into `dist/types/` and references them from `dist/index.d.ts`.
 
 Node 22.18+ / 24 runs the `.ts` sources directly (type stripping), which is
 what `npm test` and `npm run lint` rely on; the published package is the
