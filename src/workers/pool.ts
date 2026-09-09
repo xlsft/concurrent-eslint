@@ -235,12 +235,21 @@ export class Pool {
      * (another run is using it) is left alone, a dead one's files are swept.
      */
     private async adopt(): Promise<void> {
+        const trace = (socketPath: string, verdict: string): void => {
+            if (process.env.CE_DEBUG === "1") {
+                process.stderr.write(`[adopt] ${path.basename(socketPath)} ${verdict}\n`)
+            }
+        }
+
         await Promise.all(daemon.list(this.sockets).map(async (socketPath) => {
+            const started = Date.now()
+
             try {
                 const found = await connect<Workers.Request>(socketPath, warm.probe)
 
                 if (found.hello.type !== "hello") {
                     found.socket.destroy()
+                    trace(socketPath, "busy with another run")
 
                     return
                 }
@@ -251,13 +260,26 @@ export class Pool {
                     found.io.send({ type: "shutdown" })
                     found.socket.end()
                     fs.rmSync(daemon.stderr(socketPath), { force: true })
+                    trace(socketPath, `stale: epoch ${found.hello.epoch} vs ${this.epoch}, heap ${found.hello.heap} vs ${this.heap}`)
 
                     return
                 }
 
                 this.warm.push(found as Workers.Warm)
-            } catch {
-                daemon.forget(socketPath)
+                trace(socketPath, `adopted in ${Date.now() - started}ms (shard ${found.hello.shard})`)
+            } catch (error) {
+                const reason = error instanceof Error ? error.message : String(error)
+
+                trace(socketPath, `skipped after ${Date.now() - started}ms: ${reason}`)
+
+                // Only a socket nobody listens on is a leftover of a dead worker.
+                // A connection that was accepted but not answered in time is a
+                // live worker that is busy — collecting the garbage of the run it
+                // just finished, most likely — and deleting its socket would
+                // orphan it: alive, holding gigabytes, and never adopted again.
+                if ((error as NodeJS.ErrnoException).code === "ECONNREFUSED" || (error as NodeJS.ErrnoException).code === "ENOENT") {
+                    daemon.forget(socketPath)
+                }
             }
         }))
     }
