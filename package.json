@@ -1,6 +1,6 @@
 {
   "name": "concurrent-eslint",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Multi-process ESLint runner: live progress, a CPU/memory safeguard, warm workers between runs and a shared cache",
   "keywords": [
     "eslint",
