@@ -1,0 +1,45 @@
+name: Release
+
+# Publishes to npm when a version tag is pushed:
+#
+#   npm run release          # patch bump, tag, push
+#   npm run release:minor
+#
+# Uses npm trusted publishing (OIDC): no token to store. On npmjs.com, open
+# the package → Settings → Trusted publishers and add this repository with
+# the workflow file name "release.yml". Until that is configured, set an
+# NPM_TOKEN secret instead and it is picked up automatically.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - name: Check that the tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          [ "v$version" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != v$version"; exit 1; }
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

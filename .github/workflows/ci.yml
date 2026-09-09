@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run docs
+      - run: npm run build
+      - name: Unit tests
+        # Type stripping ships in Node 22.18+ / 24; older Node runs the tests off the build.
+        run: npm test
+        if: matrix.node != 20
+      - name: Lint this repository with the built CLI
+        run: node dist/cli.js --headless --no-daemon --max-warnings 0
+      - name: Smoke-test the packed tarball
+        run: |
+          npm pack --silent
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          npm init -y >/dev/null
+          npm install --silent "$GITHUB_WORKSPACE"/concurrent-eslint-*.tgz eslint
+          printf 'export default [{ files: ["**/*.js"], rules: { "no-unused-vars": "error" } }]\n' > eslint.config.mjs
+          printf 'const unused = 1\n' > bad.js
+          if npx concurrent-eslint --headless --no-daemon; then echo "expected exit 1"; exit 1; fi
+          rm bad.js && printf 'export const ok = 1\n' > good.js
+          npx concurrent-eslint --headless --no-daemon
