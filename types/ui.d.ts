@@ -20,6 +20,8 @@ declare namespace Ui {
         cyan: Paint
         /** Fixes. */
         magenta: Paint
+        /** Warm workers. */
+        orange: Paint
         /** Secondary text in the help. */
         gray: Paint
         /** Emphasis. */

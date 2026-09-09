@@ -174,8 +174,14 @@ export const run = async (argv: string[], { cwd = process.cwd() }: Cli.RunOption
 
     const { threads } = plan
 
+    // The header says whether the run starts warm, so the warm workers have
+    // to be known by now; probing them takes milliseconds.
+    await pool.adoption
+
+    const warmth = pool.warmed() > 0 ? c.orange("(warm)") : c.cyan("(cold)")
+
     process.stdout.write(`\n ${c.bold(c.cyan("concurrent-eslint"))}  ${c.dim(`${path.basename(config)} · ${scope} in ${took}s`)}\n`)
-    process.stdout.write(` ${c.dim(`${plural(list.length, "file")} · ${plural(threads, "worker")} · ${plural(plan.cores, "core")} · ${plan.heap} MB heap per worker${flags ? ` · ${flags}` : ""}`)}\n`)
+    process.stdout.write(` ${c.dim(`${plural(list.length, "file")} · ${plural(threads, "worker")}`)} ${warmth} ${c.dim(`· ${plural(plan.cores, "core")} · ${plan.heap} MB heap per worker${flags ? ` · ${flags}` : ""}`)}\n`)
 
     if (plan.overcommitted) {
         process.stdout.write(` ${c.yellow("memory:")} ${c.dim(`only ${(plan.available / 1073741824).toFixed(1)}G of the ${plan.budgetGb}G budget is free — the pool will wait for room before it starts`)}\n`)
@@ -197,8 +203,6 @@ export const run = async (argv: string[], { cwd = process.cwd() }: Cli.RunOption
     // slot. Sharding across slots the safeguard will never open just means the
     // running workers have to steal it all back one empty queue at a time.
     // Spinning up a worker that will lint three files is a net loss.
-    await pool.adoption
-
     const useful = Math.max(1, Math.ceil(list.length / guard.perWorker))
 
     pool.governor.cap(useful)

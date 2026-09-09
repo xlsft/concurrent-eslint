@@ -12,7 +12,7 @@ export const RESET = `${ESC}[0m`
 
 /** Colors; every paint is a no-op when disabled. */
 export const palette = (enabled: boolean): Ui.Palette => {
-    const wrap = (open: number, close: number): Ui.Paint => (s) =>
+    const wrap = (open: number | string, close: number): Ui.Paint => (s) =>
         (enabled ? `${ESC}[${open}m${s}${ESC}[${close}m` : String(s))
 
     return {
@@ -22,6 +22,8 @@ export const palette = (enabled: boolean): Ui.Palette => {
         yellow: wrap(33, 39),
         cyan: wrap(36, 39),
         magenta: wrap(35, 39),
+        // 256-color: the 16-color palette has no orange.
+        orange: wrap("38;5;208", 39),
         gray: wrap(90, 39),
         bold: wrap(1, 22),
         dim: wrap(2, 22),

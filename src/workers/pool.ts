@@ -175,6 +175,11 @@ export class Pool {
         this.kill()
     }
 
+    /** Warm workers found and not yet handed a job; meaningful once `adoption` settled. */
+    warmed(): number {
+        return this.warm.length
+    }
+
     /** Workers busy on average over the run. */
     average(): number {
         return this.samples > 0 ? this.sum / this.samples : this.plan.threads
