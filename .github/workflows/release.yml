@@ -21,6 +21,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,10 +37,16 @@ jobs:
         run: |
           version="$(node -p "require('./package.json').version")"
           [ "v$version" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != v$version"; exit 1; }
-      - name: Publish
+      # Trusted publishing: no token, npm exchanges the job's OIDC token itself.
+      - name: Publish (trusted publishing)
+        if: env.NPM_TOKEN == ''
+        run: npm publish --provenance --access public
+      # Fallback: an NPM_TOKEN secret (granular automation token).
+      - name: Publish (token)
+        if: env.NPM_TOKEN != ''
         run: npm publish --provenance --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
       - name: GitHub release
         uses: softprops/action-gh-release@v2
         with:
